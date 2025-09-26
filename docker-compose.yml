@@ -1,0 +1,20 @@
+services:
+  crypto-bot:
+    build: .
+    container_name: crypto-bot
+    working_dir: /app
+    ports:
+      - "8501:8501"   # Streamlit
+      - "8888:8888"   # Jupyter (optional)
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - EXCHANGE_API_KEY=${EXCHANGE_API_KEY}
+      - EXCHANGE_API_SECRET=${EXCHANGE_API_SECRET}
+    command: >
+      bash -c "
+        if [ -f ./start.sh ]; then chmod +x ./start.sh && ./start.sh;
+        else streamlit run app/dashboard.py --server.port=8501 --server.address=0.0.0.0; fi
+      "
