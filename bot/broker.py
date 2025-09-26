@@ -1,8 +1,7 @@
 import os
 import random
-from datetime import datetime, timezone
 import pandas as pd
-
+from datetime import datetime
 try:
     import ccxt
 except ImportError:
@@ -28,10 +27,9 @@ class Broker:
 
     def fetch_ohlcv(self, symbol="BTC/USDT", timeframe="1h", limit=200):
         if self.mode == "paper":
-            prices = [30000 + random.gauss(0, 200) for _ in range(limit)]
-            ts = pd.date_range(end=pd.Timestamp.utcnow(), periods=limit, freq="h")
+            prices = [20000 + random.gauss(0, 200) for _ in range(limit)]
             df = pd.DataFrame({
-                "timestamp": ts,
+                "timestamp": pd.date_range(end=datetime.utcnow(), periods=limit, freq="h"),
                 "open": prices,
                 "high": [p * (1 + random.uniform(0, 0.01)) for p in prices],
                 "low": [p * (1 - random.uniform(0, 0.01)) for p in prices],
@@ -40,42 +38,31 @@ class Broker:
             })
             return df
         else:
-            try:
-                data = self.exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
-                df = pd.DataFrame(data, columns=["timestamp","open","high","low","close","volume"])
-                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
-                return df
-            except Exception as e:
-                print(f"Error fetching OHLCV: {e}")
-                return pd.DataFrame()
+            data = self.exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+            df = pd.DataFrame(data, columns=["timestamp","open","high","low","close","volume"])
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+            return df
 
     def place_order(self, symbol, side, qty, price=None):
-        ts = datetime.now(timezone.utc).isoformat()
         if self.mode == "paper":
-            executed = float(price if price else 30000 + random.uniform(-200, 200))
-            fee = 0.0
             return {
-                "timestamp": ts,
+                "timestamp": datetime.utcnow().isoformat(),
                 "symbol": symbol,
                 "side": side,
-                "price": executed,
-                "qty": float(qty),
-                "fee": fee,
+                "price": price if price else 20000 + random.uniform(-200, 200),
+                "qty": qty,
+                "fee": 0.0,
                 "pnl": 0.0
             }
         else:
-            try:
-                order = self.exchange.create_market_order(symbol, side, qty)
-                filled_price = float(price if price else order.get("average") or order.get("price"))
-                return {
-                    "timestamp": ts,
-                    "symbol": symbol,
-                    "side": side,
-                    "price": filled_price,
-                    "qty": float(qty),
-                    "fee": 0.0,
-                    "pnl": 0.0
-                }
-            except Exception as e:
-                print(f"Error placing order: {e}")
-                return None
+            order = self.exchange.create_market_order(symbol, side, qty)
+            filled_price = float(price if price else order.get("average") or order["price"])
+            return {
+                "timestamp": datetime.utcnow().isoformat(),
+                "symbol": symbol,
+                "side": side,
+                "price": filled_price,
+                "qty": qty,
+                "fee": 0.0,
+                "pnl": 0.0
+            }

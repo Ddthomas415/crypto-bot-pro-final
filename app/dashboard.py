@@ -105,6 +105,7 @@ def main():
         st.sidebar.success("Configuration saved")
 
     tab1, tab2, tab3 = st.tabs(["Chart", "Trades", "Controls"])
+
     with tab1:
         trades = read_trades(symbol=symbol)
         try:
@@ -130,8 +131,90 @@ def main():
             st.dataframe(trades)
 
     with tab3:
-        st.subheader("Bot Controls & Config")
-        st.json(cfg)
+        st.subheader("⚙️ Bot Controls & Configuration")
+
+        with st.form("config_form"):
+            st.markdown("### General Settings")
+            mode = st.selectbox("Mode", options=["paper", "live"], index=["paper", "live"].index(cfg.get("mode", "paper")))
+            trade_qty = st.number_input("Trade Quantity", min_value=0.0001, value=float(cfg.get("trade_qty", 0.001)), format="%.6f")
+
+            st.markdown("### Risk Management")
+            risk = cfg.get("risk", {})
+            risk_per_trade = st.slider("Risk per Trade (%)", 0.001, 0.05, float(risk.get("risk_per_trade", 0.005)))
+            stop_loss = st.slider("Stop Loss (%)", 0.005, 0.1, float(risk.get("stop_loss", 0.02)))
+            take_profit = st.slider("Take Profit (%)", 0.01, 0.2, float(risk.get("take_profit", 0.04)))
+
+            st.markdown("### Limits")
+            limits = cfg.get("limits", {})
+            max_daily_dd = st.slider("Max Daily Drawdown (%)", 0.01, 0.2, float(limits.get("max_daily_dd", 0.02)))
+            max_session_dd = st.slider("Max Session Drawdown (%)", 0.01, 0.2, float(limits.get("max_session_dd", 0.05)))
+            max_open_trades = st.number_input("Max Open Trades", min_value=1, max_value=10, value=int(limits.get("max_open_trades", 1)))
+
+            st.markdown("### Auto Trading")
+            auto = cfg.get("auto", {})
+            auto_enabled = st.checkbox("Enable Auto Mode", value=auto.get("enabled", False))
+            interval_min = st.number_input("Interval (minutes)", min_value=1, value=int(auto.get("interval_min", 60)))
+            run_minutes = st.number_input("Run Duration (minutes)", min_value=1, value=int(auto.get("run_minutes", 10)))
+
+            st.markdown("### Notifications")
+            notif = cfg.get("notifications", {})
+
+            st.markdown("**Email Settings**")
+            email_cfg = notif.get("email", {})
+            email_enabled = st.checkbox("Enable Email Alerts", value=email_cfg.get("enabled", False))
+            smtp_server = st.text_input("SMTP Server", value=email_cfg.get("smtp_server", ""))
+            smtp_port = st.number_input("SMTP Port", value=email_cfg.get("smtp_port", 587))
+            sender = st.text_input("Sender Email", value=email_cfg.get("sender", ""))
+            password = st.text_input("Email Password", value=email_cfg.get("password", ""), type="password")
+            recipients = st.text_area("Recipient Emails (comma-separated)", value=",".join(email_cfg.get("recipients", [])))
+
+            st.markdown("**Telegram Settings**")
+            tg_cfg = notif.get("telegram", {})
+            tg_enabled = st.checkbox("Enable Telegram Alerts", value=tg_cfg.get("enabled", False))
+            bot_token = st.text_input("Bot Token", value=tg_cfg.get("bot_token", ""))
+            chat_id = st.text_input("Chat ID", value=tg_cfg.get("chat_id", ""))
+
+            submitted = st.form_submit_button("💾 Save Configuration")
+            if submitted:
+                new_cfg = cfg.copy()
+                new_cfg["mode"] = mode
+                new_cfg["trade_qty"] = trade_qty
+                new_cfg["risk"] = {
+                    "risk_per_trade": risk_per_trade,
+                    "stop_loss": stop_loss,
+                    "take_profit": take_profit,
+                    "fast": risk.get("fast", 12),
+                    "slow": risk.get("slow", 26),
+                }
+                new_cfg["limits"] = {
+                    "max_daily_dd": max_daily_dd,
+                    "max_session_dd": max_session_dd,
+                    "max_open_trades": max_open_trades
+                }
+                new_cfg["auto"] = {
+                    "enabled": auto_enabled,
+                    "interval_min": interval_min,
+                    "run_minutes": run_minutes,
+                    "last_auto_start": auto.get("last_auto_start", None)
+                }
+                new_cfg["notifications"] = {
+                    "email": {
+                        "enabled": email_enabled,
+                        "smtp_server": smtp_server,
+                        "smtp_port": smtp_port,
+                        "sender": sender,
+                        "password": password,
+                        "recipients": [r.strip() for r in recipients.split(",") if r.strip()]
+                    },
+                    "telegram": {
+                        "enabled": tg_enabled,
+                        "bot_token": bot_token,
+                        "chat_id": chat_id
+                    }
+                }
+                write_config(new_cfg)
+                st.success("✅ Configuration saved!")
+
         c1, c2 = st.columns(2)
         if c1.button("▶️ Start Bot"):
             if KILL_FLAG.exists():
